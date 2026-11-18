@@ -36,6 +36,26 @@
   .paper table{width:100%;border-collapse:collapse;font-size:14pt;table-layout:fixed}
   .paper th,.paper td{border:1px solid #000;height:1.06cm;text-align:center;vertical-align:middle;padding:0 2px}
   .paper th{background:#d9d9d9;font-weight:bold}
+  /* roster picker */
+  .rp-top{display:flex;gap:8px;align-items:center}
+  .rp-top input{flex:1}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .rp-list{margin-top:10px;max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+  .rp-group{border-bottom:1px solid var(--line)}
+  .rp-group:last-child{border-bottom:0}
+  .rp-gh{position:sticky;top:0;background:#f3f5f7;display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px;font-weight:600;z-index:1}
+  .rp-gh .n{color:var(--muted);font-weight:400;font-size:12px}
+  .rp-item{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 26px;font-size:14px;cursor:pointer}
+  .rp-item:hover{background:#f7f9fb}
+  .rp-item .t{color:var(--muted);font-size:12px;min-width:5.5em}
+  .rp-item .note{color:#a0661b;font-size:11px}
+  .rp-foot{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .rp-foot .cnt{flex:1;font-size:13px;color:var(--muted)}
+  .btn.sm{padding:5px 10px;font-size:13px}
+  .rp-msg{font-size:13px;color:var(--muted);padding:12px}
+  .rp-msg.err{color:#b42318}
   @media print{
     @page{size:A4;margin:20mm}
     body{background:#fff}
@@ -50,7 +70,7 @@
 </head>
 <body>
 <header>
-  <h1>研習／活動簽到表產生器</h1>
+  <h1>研習／活動簽到表產生器 <small id="modeBadge" style="font-size:13px;color:var(--muted);font-weight:500"></small></h1>
   <button class="btn" id="btnReset">清空重填</button>
   <span class="hint" id="status"></span>
   <button class="btn" id="btnPdf" title="開啟列印視窗，目的地選「另存為 PDF」">下載 PDF</button>
@@ -58,6 +78,30 @@
 </header>
 <main>
   <div class="form">
+    <div class="panel" id="rpLogin" style="display:none">
+      <h2>從全校名單勾選</h2>
+      <p class="hint" style="margin:0 0 10px">登入學校帳號（g.ntsh.ntpc.edu.tw）後，可以直接勾選全校教職員。限圖書館授權的同仁使用；不需要名單的話，直接在下方「名單」手動輸入即可，不用登入。</p>
+      <a class="btn primary" id="rpLoginBtn" href="#" target="_top" style="display:inline-block;text-decoration:none">登入學校帳號，使用校內名單</a>
+    </div>
+
+    <div class="panel" id="rpPanel">
+      <h2>從全校名單勾選</h2>
+      <div class="rp-top">
+        <input type="text" id="rpQ" placeholder="搜尋姓名、職稱或處室">
+        <button class="btn sm" id="rpReload" title="重新讀取試算表">重新整理</button>
+      </div>
+      <div class="chips" id="rpChips"></div>
+      <div class="rp-list" id="rpList"><div class="rp-msg">名單載入中…</div></div>
+      <div class="rp-foot">
+        <span class="cnt" id="rpCnt">已勾選 0 人</span>
+        <button class="btn sm" id="rpAll">全選顯示的人</button>
+        <button class="btn sm" id="rpClear">清除勾選</button>
+        <button class="btn sm" id="rpReplace">取代名單</button>
+        <button class="btn sm primary" id="rpAdd">加入名單</button>
+      </div>
+      <div class="hint" id="rpInfo"></div>
+    </div>
+
     <div class="panel">
       <h2>標題</h2>
       <label>第一行（學校／計畫）</label>
@@ -93,22 +137,10 @@
     <div class="panel">
       <h2>名單</h2>
       <label>每行一人：職稱　姓名（可直接從 Excel 複製兩欄貼上）</label>
-      <textarea id="names">校長	柯雅菱
-輔導室主任	林家妃
-圖書館主任	蔡雅安
-活動組組長	邵敏惠
-生輔組組長	周彥真
-訓育組組長	李冠賢
-地理教師	尹詩惠
-英文教師	楊介萱
-地理教師	李嘉雯
-數學教師	王文賢
-數學教師	李秀章
-總務處幹事	許凱茹
-圖書館幹事	張雅婷
-實習教師	曾淯盛
-實習教師	王昱涵
-實習教師	李若葳</textarea>
+      <textarea id="names">校長	王大明
+教務主任	李小華
+國文教師	陳美玲
+數學教師	林志豪</textarea>
       <div class="count" id="count"></div>
       <div class="row">
         <div>
@@ -368,6 +400,114 @@
     $('blank').value = 2; render();
   });
   render();
+
+  /* ---------- roster picker (Google 試算表) ---------- */
+  var SCHOOL_URL = '__SCHOOL_URL__';
+  var roster = [], picked = {}, deptFilter = '';
+  function key(p){ return p.dept + '|' + p.title + '|' + p.name; }
+  function rpMsg(t, err){ $('rpList').innerHTML = '<div class="rp-msg' + (err?' err':'') + '">' + esc(t) + '</div>'; }
+
+  function rpRender(){
+    var q = $('rpQ').value.trim().toLowerCase();
+    var depts = [];
+    roster.forEach(function(p){ if(depts.indexOf(p.dept) < 0) depts.push(p.dept); });
+    $('rpChips').innerHTML = ['<button class="chip' + (deptFilter===''?' on':'') + '" data-d="">全部</button>']
+      .concat(depts.map(function(d){ return '<button class="chip' + (deptFilter===d?' on':'') + '" data-d="' + esc(d) + '">' + esc(d || '未分類') + '</button>'; })).join('');
+    var groups = {};
+    roster.forEach(function(p, i){
+      if(deptFilter && p.dept !== deptFilter) return;
+      if(q && (p.dept + p.title + p.name + p.note).toLowerCase().indexOf(q) < 0) return;
+      (groups[p.dept] = groups[p.dept] || []).push(i);
+    });
+    var html = '';
+    depts.forEach(function(d){
+      var ids = groups[d]; if(!ids) return;
+      var all = ids.every(function(i){ return picked[key(roster[i])]; });
+      html += '<div class="rp-group"><label class="rp-gh"><input type="checkbox" data-g="' + esc(d) + '"' + (all?' checked':'') + '> ' + esc(d || '未分類') + ' <span class="n">' + ids.length + ' 人</span></label>';
+      ids.forEach(function(i){
+        var p = roster[i];
+        html += '<label class="rp-item"><input type="checkbox" data-i="' + i + '"' + (picked[key(p)]?' checked':'') + '><span class="t">' + esc(p.title) + '</span><span>' + esc(p.name) + '</span>' + (p.note ? '<span class="note">' + esc(p.note) + '</span>' : '') + '</label>';
+      });
+      html += '</div>';
+    });
+    $('rpList').innerHTML = html || '<div class="rp-msg">找不到符合的人。</div>';
+    rpCount();
+  }
+  function rpCount(){ $('rpCnt').textContent = '已勾選 ' + Object.keys(picked).length + ' 人'; }
+  function pickedList(){ return roster.filter(function(p){ return picked[key(p)]; }); }
+
+  function rpApply(replace){
+    var list = pickedList();
+    if(!list.length){ $('rpInfo').textContent = '請先勾選人員。'; return; }
+    var existing = replace ? [] : $('names').value.split(/\r?\n/).filter(function(l){ return l.trim(); });
+    var have = {};
+    parseNames().forEach(function(p){ have[p.name] = 1; });
+    var added = 0, skipped = 0;
+    list.forEach(function(p){
+      if(!replace && have[p.name]){ skipped++; return; }
+      existing.push(p.title + '\t' + p.name); added++;
+    });
+    $('order').value = 'tn';
+    $('names').value = existing.join('\n');
+    picked = {}; rpRender(); render();
+    $('rpInfo').textContent = (replace ? '已取代名單，共 ' : '已加入 ') + added + ' 人' + (skipped ? '（' + skipped + ' 人已在名單中，略過）' : '') + '。';
+  }
+
+  $('rpList').addEventListener('change', function(e){
+    var t = e.target;
+    if(t.dataset.i !== undefined){
+      var p = roster[+t.dataset.i];
+      if(t.checked) picked[key(p)] = 1; else delete picked[key(p)];
+      rpRender();
+    } else if(t.dataset.g !== undefined){
+      var q = $('rpQ').value.trim().toLowerCase();
+      roster.forEach(function(p){
+        if(p.dept !== t.dataset.g) return;
+        if(q && (p.dept + p.title + p.name + p.note).toLowerCase().indexOf(q) < 0) return;
+        if(t.checked) picked[key(p)] = 1; else delete picked[key(p)];
+      });
+      rpRender();
+    }
+  });
+  $('rpChips').addEventListener('click', function(e){
+    if(e.target.dataset.d === undefined) return;
+    deptFilter = e.target.dataset.d; rpRender();
+  });
+  $('rpQ').addEventListener('input', rpRender);
+  $('rpAll').addEventListener('click', function(){
+    var q = $('rpQ').value.trim().toLowerCase();
+    roster.forEach(function(p){
+      if(deptFilter && p.dept !== deptFilter) return;
+      if(q && (p.dept + p.title + p.name + p.note).toLowerCase().indexOf(q) < 0) return;
+      picked[key(p)] = 1;
+    });
+    rpRender();
+  });
+  $('rpClear').addEventListener('click', function(){ picked = {}; rpRender(); $('rpInfo').textContent = ''; });
+  $('rpAdd').addEventListener('click', function(){ rpApply(false); });
+  $('rpReplace').addEventListener('click', function(){ rpApply(true); });
+
+  function loadRoster(){
+    if(!(window.google && google.script && google.script.run)){
+      if(window.__mockRoster){ roster = window.__mockRoster.people; rpRender(); $('rpInfo').textContent = '測試資料'; return; }
+      // 公開版：不顯示名單，只提供登入按鈕
+      $('rpPanel').style.display = 'none';
+      if(/^https:/.test(SCHOOL_URL)){ $('rpLogin').style.display = 'block'; $('rpLoginBtn').href = SCHOOL_URL; }
+      return;
+    }
+    $('modeBadge').textContent = '校內版';
+    rpMsg('名單載入中…');
+    google.script.run
+      .withSuccessHandler(function(res){
+        roster = res.people || [];
+        rpRender();
+        $('rpInfo').textContent = '共 ' + roster.length + ' 人' + (res.updated ? '（讀取時間 ' + res.updated + '）' : '');
+      })
+      .withFailureHandler(function(err){ rpMsg('名單讀取失敗：' + (err && err.message || err), true); })
+      .getRoster();
+  }
+  $('rpReload').addEventListener('click', loadRoster);
+  loadRoster();
 })();
 </script>
 </body>
