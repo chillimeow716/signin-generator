@@ -125,6 +125,20 @@
     </div>
 
     <div class="panel">
+      <h2>字體</h2>
+      <label>簽到表字體</label>
+      <select id="font">
+        <option value="標楷體">標楷體</option>
+        <option value="新細明體">新細明體</option>
+        <option value="微軟正黑體">微軟正黑體</option>
+        <option value="細明體">細明體</option>
+        <option value="custom">其他（自行輸入）</option>
+      </select>
+      <input type="text" id="fontCustom" placeholder="輸入電腦上已安裝的字體名稱，例如：華康中黑體" style="margin-top:6px;display:none">
+      <div class="hint">Word 檔會套用這個字體；開啟檔案的電腦需要有安裝該字體才會正確顯示。</div>
+    </div>
+
+    <div class="panel">
       <h2>表頭欄位</h2>
       <div class="row">
         <div><label>第 1 欄</label><input type="text" id="h1" value="編號"></div>
@@ -147,7 +161,7 @@
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var FIELDS = ['t1','t2','suffix','place','date','tStart','tEnd','dateText','names','order','blank','h1','h2','h3','h4','h5','extra'];
+  var FIELDS = ['t1','t2','suffix','place','date','tStart','tEnd','dateText','names','order','blank','h1','h2','h3','h4','h5','extra','font','fontCustom'];
   var KEY = 'signin-generator-v1';
   var dateTextTouched = false;
 
@@ -195,6 +209,20 @@
   // column widths in twips (sample: 1200/2800/2400/3238 = 9638)
   function widths(n){ return n === 5 ? [1000,2300,1900,2219,2219] : [1200,2800,2400,3238]; }
 
+  // font: Word name + CSS fallbacks for preview
+  var FONT_CSS = {
+    '標楷體': '"標楷體","DFKai-SB","BiauKai","Kaiti TC",serif',
+    '新細明體': '"新細明體","PMingLiU","Noto Serif TC","Songti TC",serif',
+    '微軟正黑體': '"微軟正黑體","Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif',
+    '細明體': '"細明體","MingLiU","Noto Serif TC","Songti TC",serif'
+  };
+  function fontName(){
+    var v = $('font').value;
+    if(v === 'custom') return ($('fontCustom').value || '').trim() || '標楷體';
+    return v;
+  }
+  function fontCss(name){ return FONT_CSS[name] || ('"' + name.replace(/"/g,'') + '",serif'); }
+
   /* ---------- preview ---------- */
   function render(){
     var d = getData(), w = widths(d.heads.length), tot = w.reduce(function(a,b){return a+b;},0);
@@ -211,13 +239,16 @@
     });
     h += '</tbody></table>';
     $('paper').innerHTML = h;
+    $('paper').style.fontFamily = fontCss(fontName());
+    $('fontCustom').style.display = $('font').value === 'custom' ? 'block' : 'none';
     $('count').textContent = '共 ' + d.people + ' 人，表格 ' + d.rows.length + ' 列';
     save();
   }
 
   /* ---------- docx ---------- */
-  var FONT = '<w:rFonts w:ascii="標楷體" w:eastAsia="標楷體" w:hAnsi="標楷體" w:cs="標楷體" w:hint="eastAsia"/>';
   function run(text, sz, bold){
+    var f = esc(fontName());
+    var FONT = '<w:rFonts w:ascii="'+f+'" w:eastAsia="'+f+'" w:hAnsi="'+f+'" w:cs="'+f+'" w:hint="eastAsia"/>';
     return '<w:r><w:rPr>'+FONT+(bold?'<w:b/><w:bCs/>':'')+'<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr><w:t xml:space="preserve">'+esc(text)+'</w:t></w:r>';
   }
   function para(text, sz, bold, after, center){
