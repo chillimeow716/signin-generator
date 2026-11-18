@@ -52,7 +52,7 @@
   .rp-item .t{color:var(--muted);font-size:12px;min-width:5.5em}
   .rp-item .note{color:#a0661b;font-size:11px}
   .rp-foot{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
-  .rp-foot .cnt{flex:1;font-size:13px;color:var(--muted)}
+  .rp-foot .cnt{flex:1 0 100%;font-size:13px;color:var(--muted)}
   .btn.sm{padding:5px 10px;font-size:13px}
   .rp-msg{font-size:13px;color:var(--muted);padding:12px}
   .rp-msg.err{color:#b42318}
@@ -402,7 +402,7 @@
   render();
 
   /* ---------- roster picker (Google 試算表) ---------- */
-  var SCHOOL_URL = '__SCHOOL_URL__';
+  var SCHOOL_URL = 'https://script.google.com/a/macros/g.ntsh.ntpc.edu.tw/s/AKfycbxcBaTXjXZUEFsG_sLuOba60afH6_tTrCTA0-3CwGz2vXPVajNDfGKNNxJYzwH6zqhDSQ/exec';
   var roster = [], picked = {}, deptFilter = '';
   function key(p){ return p.dept + '|' + p.title + '|' + p.name; }
   function rpMsg(t, err){ $('rpList').innerHTML = '<div class="rp-msg' + (err?' err':'') + '">' + esc(t) + '</div>'; }
