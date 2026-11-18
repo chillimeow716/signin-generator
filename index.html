@@ -44,6 +44,7 @@
     .paper{box-shadow:none;width:auto;min-height:0;padding:0}
     .paper thead{display:table-header-group}
     .paper tr{break-inside:avoid}
+    .paper th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
@@ -52,6 +53,7 @@
   <h1>研習／活動簽到表產生器</h1>
   <button class="btn" id="btnReset">清空重填</button>
   <span class="hint" id="status"></span>
+  <button class="btn" id="btnPdf" title="開啟列印視窗，目的地選「另存為 PDF」">下載 PDF</button>
   <button class="btn primary" id="btnDocx">下載 Word (.docx)</button>
 </header>
 <main>
@@ -302,6 +304,16 @@
     return new Blob(parts.concat(central,[end]), {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
   }
 
+  function baseName(){ return ($('t2').value || '簽到表').replace(/[\\\/:*?"<>|]/g,'').slice(0,60) + '_簽到表'; }
+
+  function downloadPdf(){
+    var old = document.title;
+    document.title = baseName();
+    $('status').textContent = '在列印視窗的「目的地」選「另存為 PDF」';
+    window.print();
+    setTimeout(function(){ document.title = old; }, 1000);
+  }
+
   function downloadDocx(){
     var d = getData();
     var blob = zip([
@@ -309,7 +321,7 @@
       {name:'_rels/.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'},
       {name:'word/document.xml', data:documentXml(d)}
     ]);
-    var fname = ($('t2').value || '簽到表').replace(/[\\\/:*?"<>|]/g,'').slice(0,60) + '_簽到表.docx';
+    var fname = baseName() + '.docx';
     var st = $('status'); st.textContent = '';
     var getDl = (window.claude && window.claude.use) ? window.claude.use('downloads') : Promise.resolve(null);
     getDl.then(function(dl){
@@ -350,6 +362,7 @@
     el.addEventListener('input', render); el.addEventListener('change', render);
   });
   $('btnDocx').addEventListener('click', downloadDocx);
+  $('btnPdf').addEventListener('click', downloadPdf);
   $('btnReset').addEventListener('click', function(){
     ['t2','place','names'].forEach(function(id){ $(id).value=''; });
     $('blank').value = 2; render();
