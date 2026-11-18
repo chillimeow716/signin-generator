@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>研習簽到表產生器</title>
+<style>
+  :root{--ink:#1f2328;--muted:#6a737d;--line:#d0d7de;--bg:#f6f7f9;--accent:#1f5fae;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;color:var(--ink);background:var(--bg)}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);background:#fff;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;flex:1}
+  .btn{border:1px solid var(--line);background:#fff;padding:8px 14px;border-radius:6px;font-size:14px;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn:hover{filter:brightness(.96)}
+  main{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:20px;padding:20px;align-items:start}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px}
+  .panel h2{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600}
+  .panel + .panel{margin-top:14px}
+  label{display:block;font-size:13px;margin:10px 0 4px;color:var(--muted)}
+  input[type=text],input[type=number],input[type=date],input[type=time],textarea,select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:14px;background:#fff}
+  textarea{min-height:220px;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.5}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5}
+  .check{display:flex;align-items:center;gap:6px;font-size:13px;margin-top:10px;color:var(--ink)}
+  .count{font-size:12px;color:var(--muted);text-align:right;margin-top:4px}
+  /* preview (A4) */
+  .paper-wrap{overflow:auto}
+  .paper{background:#fff;width:210mm;min-height:297mm;margin:0 auto;padding:20mm;box-shadow:0 1px 4px rgba(0,0,0,.15);
+         font-family:"標楷體","DFKai-SB","BiauKai","Kaiti TC",serif;color:#000}
+  .paper .t{font-size:20pt;font-weight:bold;text-align:center;margin:0 0 12pt}
+  .paper .m{font-size:14pt;margin:0 0 3pt}
+  .paper .m.last{margin-bottom:10pt}
+  .paper table{width:100%;border-collapse:collapse;font-size:14pt;table-layout:fixed}
+  .paper th,.paper td{border:1px solid #000;height:1.06cm;text-align:center;vertical-align:middle;padding:0 2px}
+  .paper th{background:#d9d9d9;font-weight:bold}
+  @media print{
+    @page{size:A4;margin:20mm}
+    body{background:#fff}
+    header,.form{display:none!important}
+    main{display:block;padding:0}
+    .paper{box-shadow:none;width:auto;min-height:0;padding:0}
+    .paper thead{display:table-header-group}
+    .paper tr{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>研習／活動簽到表產生器</h1>
+  <button class="btn" id="btnReset">清空重填</button>
+  <span class="hint" id="status"></span>
+  <button class="btn primary" id="btnDocx">下載 Word (.docx)</button>
+</header>
+<main>
+  <div class="form">
+    <div class="panel">
+      <h2>標題</h2>
+      <label>第一行（學校／計畫）</label>
+      <input type="text" id="t1" value="新北高中115學年度第一學期高優計畫">
+      <label>第二行（活動名稱）</label>
+      <input type="text" id="t2" value="舒紓壓力趣-從SEL談教師自我照顧">
+      <label>表單類型（接在活動名稱後）</label>
+      <select id="suffix">
+        <option value="-研習簽到表">-研習簽到表</option>
+        <option value="-活動簽到表">-活動簽到表</option>
+        <option value="-會議簽到表">-會議簽到表</option>
+        <option value="簽到表">簽到表（不加連字號）</option>
+        <option value="">（不加）</option>
+      </select>
+    </div>
+
+    <div class="panel">
+      <h2>地點與時間</h2>
+      <label>地點</label>
+      <input type="text" id="place" value="TED2">
+      <div class="row">
+        <div><label>日期</label><input type="date" id="date" value="2026-11-05"></div>
+      </div>
+      <div class="row">
+        <div><label>開始</label><input type="time" id="tStart" value="13:00"></div>
+        <div><label>結束</label><input type="time" id="tEnd" value="15:00"></div>
+      </div>
+      <label>日期列文字（可直接修改）</label>
+      <input type="text" id="dateText">
+      <div class="hint">選日期與時間會自動換成「115年11月5日（四）下午13:00-15:00」的格式；也可以直接改這一格。</div>
+    </div>
+
+    <div class="panel">
+      <h2>名單</h2>
+      <label>每行一人：職稱　姓名（可直接從 Excel 複製兩欄貼上）</label>
+      <textarea id="names">校長	柯雅菱
+輔導室主任	林家妃
+圖書館主任	蔡雅安
+活動組組長	邵敏惠
+生輔組組長	周彥真
+訓育組組長	李冠賢
+地理教師	尹詩惠
+英文教師	楊介萱
+地理教師	李嘉雯
+數學教師	王文賢
+數學教師	李秀章
+總務處幹事	許凱茹
+圖書館幹事	張雅婷
+實習教師	曾淯盛
+實習教師	王昱涵
+實習教師	李若葳</textarea>
+      <div class="count" id="count"></div>
+      <div class="row">
+        <div>
+          <label>每行順序</label>
+          <select id="order">
+            <option value="tn">職稱 姓名</option>
+            <option value="nt">姓名 職稱</option>
+          </select>
+        </div>
+        <div>
+          <label>名單後加空白列</label>
+          <input type="number" id="blank" min="0" max="200" value="2">
+        </div>
+      </div>
+      <div class="hint">分隔可用 Tab、空白、逗號或頓號；只有一個詞的行會當成姓名。</div>
+    </div>
+
+    <div class="panel">
+      <h2>表頭欄位</h2>
+      <div class="row">
+        <div><label>第 1 欄</label><input type="text" id="h1" value="編號"></div>
+        <div><label>第 2 欄</label><input type="text" id="h2" value="職稱"></div>
+      </div>
+      <div class="row">
+        <div><label>第 3 欄</label><input type="text" id="h3" value="教師"></div>
+        <div><label>第 4 欄</label><input type="text" id="h4" value="簽到"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="extra"> 多加一欄</label>
+      <input type="text" id="h5" value="簽退" style="margin-top:6px">
+    </div>
+  </div>
+
+  <div class="paper-wrap">
+    <div class="paper" id="paper"></div>
+  </div>
+</main>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var FIELDS = ['t1','t2','suffix','place','date','tStart','tEnd','dateText','names','order','blank','h1','h2','h3','h4','h5','extra'];
+  var KEY = 'signin-generator-v1';
+  var dateTextTouched = false;
+
+  /* ---------- helpers ---------- */
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function buildDateText(){
+    var d = $('date').value, s = $('tStart').value, e = $('tEnd').value;
+    if(!d) return '';
+    var p = d.split('-'), y = +p[0], m = +p[1], day = +p[2];
+    var wk = '日一二三四五六'.charAt(new Date(y, m-1, day).getDay());
+    var txt = (y-1911) + '年' + m + '月' + day + '日（' + wk + '）';
+    if(s){
+      var h = +s.split(':')[0];
+      var period = h < 12 ? '上午' : (h < 18 ? '下午' : '晚上');
+      txt += period + s + (e ? '-' + e : '');
+    }
+    return txt;
+  }
+
+  function parseNames(){
+    var swap = $('order').value === 'nt';
+    return $('names').value.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+      var parts = l.split(/[\t,，、]+|\s+/).filter(Boolean);
+      if(parts.length === 1) return {title:'', name:parts[0]};
+      if(swap) return {name:parts[0], title:parts.slice(1).join(' ')};
+      return {title:parts.slice(0,-1).join(' '), name:parts[parts.length-1]};
+    });
+  }
+
+  function getData(){
+    var people = parseNames();
+    var blank = Math.max(0, Math.min(200, parseInt($('blank').value,10) || 0));
+    var heads = [$('h1').value, $('h2').value, $('h3').value, $('h4').value];
+    if($('extra').checked) heads.push($('h5').value);
+    var rows = people.map(function(p,i){ return [String(i+1), p.title, p.name]; });
+    for(var i=0;i<blank;i++) rows.push([String(people.length+i+1), '', '']);
+    return {
+      t1: $('t1').value, t2: $('t2').value + $('suffix').value,
+      place: '地點：' + $('place').value, date: '日期：' + $('dateText').value,
+      heads: heads, rows: rows, people: people.length
+    };
+  }
+
+  // column widths in twips (sample: 1200/2800/2400/3238 = 9638)
+  function widths(n){ return n === 5 ? [1000,2300,1900,2219,2219] : [1200,2800,2400,3238]; }
+
+  /* ---------- preview ---------- */
+  function render(){
+    var d = getData(), w = widths(d.heads.length), tot = w.reduce(function(a,b){return a+b;},0);
+    var h = '';
+    if(d.t1) h += '<p class="t">'+esc(d.t1)+'</p>';
+    if(d.t2) h += '<p class="t">'+esc(d.t2)+'</p>';
+    h += '<p class="m">'+esc(d.place)+'</p><p class="m last">'+esc(d.date)+'</p>';
+    h += '<table><colgroup>' + w.map(function(x){ return '<col style="width:'+(x/tot*100).toFixed(2)+'%">'; }).join('') + '</colgroup>';
+    h += '<thead><tr>' + d.heads.map(function(x){ return '<th>'+esc(x)+'</th>'; }).join('') + '</tr></thead><tbody>';
+    d.rows.forEach(function(r){
+      h += '<tr>';
+      for(var i=0;i<d.heads.length;i++) h += '<td>'+esc(r[i]||'')+'</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    $('paper').innerHTML = h;
+    $('count').textContent = '共 ' + d.people + ' 人，表格 ' + d.rows.length + ' 列';
+    save();
+  }
+
+  /* ---------- docx ---------- */
+  var FONT = '<w:rFonts w:ascii="標楷體" w:eastAsia="標楷體" w:hAnsi="標楷體" w:cs="標楷體" w:hint="eastAsia"/>';
+  function run(text, sz, bold){
+    return '<w:r><w:rPr>'+FONT+(bold?'<w:b/><w:bCs/>':'')+'<w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/></w:rPr><w:t xml:space="preserve">'+esc(text)+'</w:t></w:r>';
+  }
+  function para(text, sz, bold, after, center){
+    return '<w:p><w:pPr><w:spacing w:after="'+after+'"/>'+(center?'<w:jc w:val="center"/>':'')+'</w:pPr>'+(text?run(text,sz,bold):'')+'</w:p>';
+  }
+  function cell(text, w, header){
+    var b = '<w:tcBorders>' + ['top','left','bottom','right'].map(function(s){ return '<w:'+s+' w:val="single" w:sz="8" w:space="0" w:color="000000"/>'; }).join('') + '</w:tcBorders>';
+    return '<w:tc><w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/>'+b+(header?'<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>':'')+'<w:vAlign w:val="center"/></w:tcPr>'
+         + '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'+(text?run(text,28,header):'')+'</w:p></w:tc>';
+  }
+  function documentXml(d){
+    var w = widths(d.heads.length), tot = w.reduce(function(a,b){return a+b;},0);
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>';
+    if(d.t1) x += para(d.t1,40,true,240,true);
+    if(d.t2) x += para(d.t2,40,true,240,true);
+    x += para(d.place,28,false,60,false) + para(d.date,28,false,200,false);
+    x += '<w:tbl><w:tblPr><w:tblW w:w="'+tot+'" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/>'
+       + '<w:tblCellMar><w:left w:w="10" w:type="dxa"/><w:right w:w="10" w:type="dxa"/></w:tblCellMar></w:tblPr>'
+       + '<w:tblGrid>' + w.map(function(v){ return '<w:gridCol w:w="'+v+'"/>'; }).join('') + '</w:tblGrid>';
+    x += '<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="600"/><w:tblHeader/><w:jc w:val="center"/></w:trPr>'
+       + d.heads.map(function(h,i){ return cell(h, w[i], true); }).join('') + '</w:tr>';
+    d.rows.forEach(function(r){
+      x += '<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="600"/><w:jc w:val="center"/></w:trPr>';
+      for(var i=0;i<d.heads.length;i++) x += cell(r[i]||'', w[i], false);
+      x += '</w:tr>';
+    });
+    x += '</w:tbl><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
+       + '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>'
+       + '<w:cols w:space="720"/><w:docGrid w:linePitch="360"/></w:sectPr></w:body></w:document>';
+    return x;
+  }
+
+  // minimal ZIP (store, no compression)
+  var CRC = (function(){ var t=[],c; for(var n=0;n<256;n++){ c=n; for(var k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+  function crc32(u){ var c=0xFFFFFFFF; for(var i=0;i<u.length;i++) c = CRC[(c^u[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+  function zip(files){
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    function u16(v){ return [v&255,(v>>>8)&255]; }
+    function u32(v){ return [v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255]; }
+    files.forEach(function(f){
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var common = [].concat(u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0));
+      var local = new Uint8Array([].concat(u32(0x04034b50),common));
+      parts.push(local,name,data);
+      central.push(new Uint8Array([].concat(u32(0x02014b50),u16(20),common,u16(0),u16(0),u16(0),u32(0),u32(offset))), name);
+      offset += local.length + name.length + data.length;
+    });
+    var csize = central.reduce(function(a,b){ return a+b.length; },0);
+    var end = new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(csize),u32(offset),u16(0)));
+    return new Blob(parts.concat(central,[end]), {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  }
+
+  function downloadDocx(){
+    var d = getData();
+    var blob = zip([
+      {name:'[Content_Types].xml', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'},
+      {name:'_rels/.rels', data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'},
+      {name:'word/document.xml', data:documentXml(d)}
+    ]);
+    var fname = ($('t2').value || '簽到表').replace(/[\\\/:*?"<>|]/g,'').slice(0,60) + '_簽到表.docx';
+    var st = $('status'); st.textContent = '';
+    var getDl = (window.claude && window.claude.use) ? window.claude.use('downloads') : Promise.resolve(null);
+    getDl.then(function(dl){
+      if(dl){
+        return dl.save({filename: fname, data: blob}).then(function(){ st.textContent = '已下載'; })
+          .catch(function(e){ st.textContent = (e && e.code === 'declined') ? '已取消' : '無法下載，請稍後再試'; });
+      }
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    });
+  }
+
+  /* ---------- persistence ---------- */
+  function save(){
+    try{
+      var o = {}; FIELDS.forEach(function(f){ var el=$(f); o[f] = el.type==='checkbox' ? el.checked : el.value; });
+      o._touched = dateTextTouched;
+      localStorage.setItem(KEY, JSON.stringify(o));
+    }catch(e){}
+  }
+  function load(){
+    try{
+      var o = JSON.parse(localStorage.getItem(KEY) || 'null'); if(!o) return false;
+      FIELDS.forEach(function(f){ if(f in o){ var el=$(f); if(el.type==='checkbox') el.checked=o[f]; else el.value=o[f]; } });
+      dateTextTouched = !!o._touched; return true;
+    }catch(e){ return false; }
+  }
+
+  /* ---------- wire up ---------- */
+  if(!load() || !$('dateText').value) $('dateText').value = buildDateText();
+  ['date','tStart','tEnd'].forEach(function(id){
+    $(id).addEventListener('input', function(){ dateTextTouched = false; $('dateText').value = buildDateText(); render(); });
+  });
+  $('dateText').addEventListener('input', function(){ dateTextTouched = true; });
+  document.querySelectorAll('.form input, .form textarea, .form select').forEach(function(el){
+    el.addEventListener('input', render); el.addEventListener('change', render);
+  });
+  $('btnDocx').addEventListener('click', downloadDocx);
+  $('btnReset').addEventListener('click', function(){
+    ['t2','place','names'].forEach(function(id){ $(id).value=''; });
+    $('blank').value = 2; render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
